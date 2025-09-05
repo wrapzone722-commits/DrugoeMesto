@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Запись на детейлинг‑мойку</title>
+<script src="https://unpkg.com/imask"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script crossorigin src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+<style>
+body { font-family:sans-serif; margin:0; padding:0; background:#f4f4f4; }
+.container { max-width:420px; margin:auto; padding:16px; }
+.card { background:#fff; border-radius:16px; padding:16px; margin-bottom:16px; box-shadow:0 4px 20px rgba(0,0,0,0.08); }
+.header { text-align:center; margin-bottom:24px; }
+.header h1 { margin:0; font-size:20px; }
+.header button { margin-top:8px; margin-right:8px; padding:8px 12px; border-radius:12px; border:none; cursor:pointer; background:#000; color:#fff; font-size:14px; }
+button { cursor:pointer; border:none; }
+.slot { padding:8px; border-radius:12px; border:1px solid #ccc; margin:4px; font-size:14px; }
+.slot.busy { opacity:0.4; cursor:not-allowed; }
+.slot.active { background:#000; color:#fff; }
+input, select, textarea { width:100%; padding:12px; border-radius:12px; border:1px solid #ccc; margin-bottom:8px; box-sizing:border-box; }
+.submit { width:100%; padding:12px; border-radius:12px; background:#000; color:#fff; font-size:16px; }
+label { display:flex; align-items:center; gap:8px; font-size:14px; margin-bottom:8px; }
+.close-btn { margin-top:12px; padding:12px; border-radius:12px; background:#000; color:#fff; width:100%; cursor:pointer; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+const SERVER_URL = "https://your-server-url.com/send";
+function formatDate(d){ const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,'0'); const day=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`;}
+function addDays(date,n){ const d=new Date(date); d.setDate(d.getDate()+n); return d;}
+function DatePicker({value,onChange}){ const days=[...Array(7)].map((_,i)=>addDays(new Date(),i)); return <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'4px'}}>{days.map(d=>{const iso=formatDate(d);const label=d.toLocaleDateString('ru-RU',{weekday:'short',day:'2-digit'}); return <button key={iso} onClick={()=>onChange(iso)} style={{padding:'8px',borderRadius:'12px',border:'1px solid #ccc',background:value===iso?'#000':'#fff',color:value===iso?'#fff':'#000'}}>{label}</button>})}</div>;}
+function App(){
+  const [date,setDate]=useState(formatDate(new Date()));
+  const [bay,setBay]=useState(1);
+  const [time,setTime]=useState('');
+  const [service,setService]=useState('Базовая мойка');
+  const [form,setForm]=useState({name:'',phone:'',car:'',contact:'',consultation:false});
+  const phoneRef=useRef(null);
+  const [tg,setTg]=useState(null);
+  useEffect(()=>{
+    if(phoneRef.current){ IMask(phoneRef.current,{mask:'+{7} 000 000-00-00'});}
+    if(window.Telegram?.WebApp){ const t=window.Telegram.WebApp; t.expand(); setTg(t); if(t.initDataUnsafe?.user){ const user=t.initDataUnsafe.user; setForm(prev=>({...prev,name:`${user.first_name || ''} ${user.last_name || ''}`.trim()}))}}
+  },[]);
+  const slots=["09:00","11:00","13:00","15:00","17:00","19:00"];
+  const occupied={1:["11:00"],2:["13:00"]};
+  const services=["Базовая мойка","Комплексная мойка","Детейлинг премиум"];
+  const showPhone=()=>alert("Телефон для связи: +7 932 321-64-44");
+  async function submit(e){
+    e.preventDefault();
+    if(!form.name||!form.phone||!form.car||!time||!service){ alert('Заполните все обязательные поля'); return;}
+    try{
+      await fetch(SERVER_URL,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...form,date,time,bay,service})});
+      alert('Ваша заявка отправлена! Мы свяжемся с вами в Telegram.');
+      setForm({name:form.name,phone:'',car:'',contact:'',consultation:false});
+      setTime('');
+      setService('Базовая мойка');
+    }catch(err){ alert('Ошибка отправки. Попробуйте позже.'); }
+  }
+  return <div className="container">
+    <div className="header">
+      <h1>Вас приветствует Drugoe Mesto</h1>
+      <div>
+        <button onClick={showPhone}>Запишитесь на детейлинг‑мойку</button>
+        <button onClick={showPhone}>Получите консультацию специалиста</button>
+      </div>
+    </div>
+    <div className="card">
+      <h2>Выберите дату</h2>
+      <DatePicker value={date} onChange={setDate}/>
+    </div>
+    <div className="card">
+      <h2>Выберите пост</h2>
+      {[1,2].map(b=>(<button key={b} onClick={()=>setBay(b)} style={{marginRight:'8px',padding:'8px',borderRadius:'12px',border:'1px solid #ccc',background:bay===b?'#000':'#fff',color:bay===b?'#fff':'#000'}}>Пост {b}</button>))}
+      <div style={{display:'flex',flexWrap:'wrap',marginTop:'12px'}}>
+        {slots.map(s=>{ const busy=(occupied[bay]||[]).includes(s); return <button key={s} disabled={busy} onClick={()=>setTime(s)} className={`slot ${busy?'busy':time===s?'active':''}`}>{s}</button>})}
+      </div>
+    </div>
+    <form onSubmit={submit} className="card">
+      <h2>Данные клиента</h2>
+      <select value={service} onChange={e=>setService(e.target.value)}>
+        {services.map(s=><option key={s} value={s}>{s}</option>)}
+      </select>
+      <input type="text" placeholder="Имя" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/>
+      <input ref={phoneRef} type="tel" placeholder="Телефон +7 ___ ___-__-__" value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})}/>
+      <input type="text" placeholder="Автомобиль" value={form.car} onChange={e=>setForm({...form,car:e.target.value})}/>
+      <textarea placeholder="Связаться с нами" value={form.contact} onChange={e=>setForm({...form,contact:e.target.value})}></textarea>
+      <label>
+        <input type="checkbox" checked={form.consultation} onChange={e=>setForm({...form,consultation:e.target.checked})}/>
+        Получить бесплатную консультацию специалиста
+      </label>
+      <button type="submit" className="submit">Подтвердить бронь</button>
+      {tg && <button type="button" className="close-btn" onClick={()=>tg.close()}>Закрыть</button>}
+    </form>
+  </div>
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
